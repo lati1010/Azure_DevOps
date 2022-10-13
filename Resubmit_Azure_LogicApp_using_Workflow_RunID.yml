@@ -1,0 +1,26 @@
+stages:
+- stage: __default
+  jobs:
+  - job: Job
+    pool:
+      name: Azure Pipelines
+      vmImage: "ubuntu-latest"
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Get details of Logicapp RUN ID'
+      inputs:
+        azureSubscription: '$(SubscriptionName)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az rest -m get --header Accept=application/json -u https://management.azure.com/subscriptions/$(subscriptionID)/resourceGroups/$(Resourcegroup_name)/providers/Microsoft.Logic/workflows/$1/triggers/manual/histories/$2?api-version=2016-06-01'
+        arguments: '$(Logicapp_Name) $(Logicapp_run_Identifier)'
+    - task: AzureCLI@2
+      displayName: 'Resubmit Logicapp workflow RunID'
+      inputs:
+        azureSubscription: '$(SubscriptionName)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az rest -m post --header Accept=application/json -u https://management.azure.com/subscriptions/$(subscriptionID)/resourceGroups/$(Resourcegroup_name)/providers/Microsoft.Logic/workflows/$1/triggers/manual/histories/$2/resubmit?api-version=2016-06-01'
+        arguments: '$(Logicapp_Name) $(Logicapp_run_Identifier)'
+      enabled: true
+
