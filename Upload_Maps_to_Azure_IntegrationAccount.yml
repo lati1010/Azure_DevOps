@@ -1,0 +1,178 @@
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- group: Upload_maps_variable_group
+
+steps:
+- task: UsePythonVersion@0
+  displayName: 'Install Python 3.x'
+
+- script: 'sudo cp -R $(repo_path) /home'
+  workingDirectory: /home/vsts/work/1/s/
+  displayName: 'Copy file from repo to Working directory'
+
+- script: |
+   pip3 install requests
+   pip3 install datetime
+   pip3 install azure.storage.blob
+   pip3 install json
+   pip3 install adal
+  workingDirectory: /home
+  displayName: 'Install python modules'
+  continueOnError: true
+
+- task: PythonScript@0
+  displayName: 'Import the Libraries'
+  inputs:
+    scriptSource: 'inline'
+    script: |
+      import requests
+      import datetime
+      from datetime import datetime, timedelta
+      from azure.storage.blob import BlobClient,generate_blob_sas, BlobSasPermissions
+      from azure.storage.blob import BlobServiceClient
+      import json
+      import adal
+      import time
+      
+      
+      #############################      Define Global variables         #################################
+      
+      account_name = "$(storage_account_name)"
+      account_key = "$(storage_accountkey)"
+      container_name = "$(container_name)"
+      blob_name = "$(blob_name)"
+      conn_str = "$(conn_str)"
+      subscriptionid = "$(subscriptionid)"
+      resourcegroup_name = "$(resourcegroup_name)"
+      integrationaccount_name = "$(integrationaccount_name)"
+      map_name = "$(map_name)"
+      map_type = "$(map_type)"
+      location = "$(location)"
+      contentType = "$(contentType)"
+      tenant = "$(tenant)"
+      CLIENTID = "$(CLIENTID)"
+      CLIENTSECRET = "$(CLIENTSECRET)"
+      repo_path = "$(repo_path)"
+      
+      #############################      Uploading MAP to Blob         #################################
+      
+      def blob_upload(conn_str,container_name,blob_name):
+          blob = BlobClient.from_connection_string(conn_str=conn_str,  container_name=container_name, blob_name=blob_name)
+          try:
+              with open(blob_name,"rb") as f:
+                  blob.upload_blob(f)
+                  print(blob_name+'  uploaded to container: azure-integrationaccount-maps successfully')
+          
+          except Exception as e:
+              print(e)
+          
+      upload_blob = blob_upload(conn_str,container_name,blob_name)
+      
+
+      ############################      Update the blob in storage account --> if MAP type is Liquid      ##############################
+      
+      authority_url = "https://login.microsoftonline.com/"+ tenant
+      client_id = CLIENTID
+      client_secret = CLIENTSECRET
+      resource = "https://storage.azure.com/"
+      context = adal.AuthenticationContext(authority_url)
+      token = context.acquire_token_with_client_credentials(resource, client_id, client_secret)
+      date = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+      update_url = "https://"+account_name+".blob.core.windows.net/"+container_name+"/"+blob_name+"?comp=properties"
+      
+      data = {}
+      
+      headers = {'Authorization': 'Bearer ' + token['accessToken'], 'x-ms-blob-content-type':'text/plain','x-ms-version':'2020-04-08', 'x-ms-date':date}   
+      
+      if map_type == 'liquid' or map_type == 'Liquid':
+        print("The Map type is Liquid")
+        x = requests.put(update_url, json = data, headers = headers)
+        print(x)
+        print(x.text)
+        print("Updated the Liquid map in azure Blob Storage_Account")
+      else:
+        print("The Map type is Xslt")
+        
+      
+      print("Updated the Blob in storage_Account")
+
+      
+      #############################      Generating SAS URL for the MAP         ##############################
+      
+      
+      def get_blob_sas(account_name, account_key, container_name, blob_name):
+          sas_blob = generate_blob_sas(account_name=account_name, 
+                                      container_name=container_name,
+                                      blob_name=blob_name,
+                                      account_key=account_key,
+                                      permission=BlobSasPermissions(read=True),
+                                      expiry=datetime.utcnow() + timedelta(hours=1))
+          return sas_blob
+      
+      sas = get_blob_sas(account_name, account_key, container_name, blob_name)
+      url = 'https://'+account_name+'.blob.core.windows.net/'+container_name+'/'+blob_name+'?'+sas
+      print("SAS URL GENERATED FOR THE UPLOADED BLOB")
+      
+      ############################      Upload the Map to Integration account         ##############################
+      
+          
+      
+      authority_url = "https://login.microsoftonline.com/"+ tenant
+      client_id = CLIENTID
+      client_secret = CLIENTSECRET
+      resource ="https://management.azure.com/"
+      context =adal.AuthenticationContext(authority_url)
+      
+      token = context.acquire_token_with_client_credentials(resource, client_id, client_secret )
+      put_url = "https://management.azure.com/subscriptions/"+subscriptionid+"/resourceGroups/"+resourcegroup_name+"/providers/Microsoft.Logic/integrationAccounts/"+integrationaccount_name+"/maps/"+map_name+"?api-version=2016-06-01"
+      headers = {'Authorization': 'Bearer ' + token['accessToken'],'Content-Type': 'application/json'}
+      data1 = {
+         "properties":{
+            "mapType":map_type,
+            "contentLink":{
+               "uri":url,
+               "contentVersion":"1.0"
+            },
+            "contentType":contentType,
+            "metadata":{}
+          },
+         "location":location
+          }
+      data = data1.__str__()      
+      
+      x = requests.put(put_url, headers = headers, data=data)
+      #print(data)
+      #print(headers)
+      print(x)
+      print(x.text)
+      print("Uploaded the MAP to Integration Account")
+      
+      ############################      delete the blob in storage account        ##############################
+      authority_url = "https://login.microsoftonline.com/"+ tenant
+      client_id = CLIENTID
+      client_secret = CLIENTSECRET
+      date = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+      print(date)
+      resource = "https://storage.azure.com/"
+      context = adal.AuthenticationContext(authority_url)
+      token = context.acquire_token_with_client_credentials(resource, client_id, client_secret)
+      
+      delete_url = "https://"+account_name+".blob.core.windows.net/"+container_name+"/"+blob_name
+      
+      data = {}
+      
+      headers = {'Authorization': 'Bearer ' + token['accessToken'], 'x-ms-version':'2021-08-06', 'x-ms-date':date, 'x-ms-delete-snapshots':'include'}   
+      
+      
+      x = requests.delete(delete_url, json = data, headers = headers)
+      print(x)
+      print(x.text)
+      print("Deleted the Blob in storage_Account")
+    workingDirectory: '/home'  
+    
+
+      
+      
+    
