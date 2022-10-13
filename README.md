@@ -22,8 +22,8 @@ This will first validate if the RUNID is present in the specified Azure subscrip
 
 Variables mentioned below has to be passed as input variables every time we trigger the pipeline. Add as Pipeline variables and check the box to Let users override this value when running this pipeline.
 
-$(Logicapp_Name)
-$(Logicapp_run_Identifier)
-$(subscriptionID)
-$(Resourcegroup_name)
-$(SubscriptionName)
+      $(Logicapp_Name)
+      $(Logicapp_run_Identifier)
+      $(subscriptionID)
+      $(Resourcegroup_name)
+      $(SubscriptionName)
