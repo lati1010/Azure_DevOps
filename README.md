@@ -1,4 +1,4 @@
-**Upload_Maps_to_Azure_IntegrationAccount.yml**
+***Upload_Maps_to_Azure_IntegrationAccount.yml***
 
 This Pipeline will help in uploading maps in Azure Integration account from Azure REPO and stores the file temporarily on Azure blob and deletes once pipeline is finished
 
@@ -14,7 +14,7 @@ Variables mentioned below has to be passed as input variables every time we trig
       contentType = "$(contentType)"
       repo_path = "$(repo_path)"
 
-**Resubmit_Azure_LogicApp_using_Workflow_RunID.yml**
+***Resubmit_Azure_LogicApp_using_Workflow_RunID.yml***
 
 This pipeline will help in resubmitting the failed/success workflow based on the previous RunID.
 
